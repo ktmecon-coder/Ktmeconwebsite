@@ -4,25 +4,28 @@ import { motion, AnimatePresence } from "motion/react";
 import { ArrowRight, Sparkles, Award, Globe, Shield, Star, BookOpen } from "lucide-react";
 import { TeamMember } from "../types";
 import ScrollReveal from "../components/ScrollReveal";
+import { DB } from "../supabaseService";
 
 export default function Team() {
   const [team, setTeam] = useState<TeamMember[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch("/api/team")
-      .then((res) => res.json())
-      .then((data) => {
-        if (Array.isArray(data)) {
-          setTeam(data);
-        }
-        setLoading(false);
-      })
-      .catch((err) => {
+    async function loadTeam() {
+      try {
+        setError(null);
+        const data = await DB.getTeamMembers();
+        setTeam(data);
+      } catch (err: any) {
         console.error("Failed to fetch team members", err);
+        setError(err.message || "Failed to retrieve team members.");
+      } finally {
         setLoading(false);
-      });
+      }
+    }
+    loadTeam();
   }, []);
 
   return (
@@ -73,6 +76,10 @@ export default function Team() {
           {loading ? (
             <div className="text-center py-24 font-mono text-xs text-neutral-400">
               Retrieving Kathmandu Economics faculty records...
+            </div>
+          ) : error ? (
+            <div className="text-center py-24 font-mono text-xs text-red-500">
+              {error}
             </div>
           ) : (
             <div className="space-y-12" id="team-grid">

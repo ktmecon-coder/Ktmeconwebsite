@@ -3,28 +3,34 @@ import { useParams, Link, useNavigate } from "react-router-dom";
 import { motion } from "motion/react";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import { TeamMember } from "../types";
+import { DB } from "../supabaseService";
 
 export default function TeamMemberProfile() {
   const { slug } = useParams();
   const navigate = useNavigate();
   const [member, setMember] = useState<TeamMember | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    setLoading(true);
-    fetch(`/api/team/${slug}`)
-      .then((res) => {
-        if (!res.ok) throw new Error("Not found");
-        return res.json();
-      })
-      .then((data) => {
+    async function loadProfile() {
+      if (!slug) return;
+      setLoading(true);
+      setError(null);
+      try {
+        const data = await DB.getTeamMemberBySlug(slug);
+        if (!data) {
+          throw new Error("Profile not found.");
+        }
         setMember(data);
-        setLoading(false);
-      })
-      .catch((err) => {
+      } catch (err: any) {
         console.error("Failed to load team member profile", err);
+        setError(err.message || "Failed to load profile.");
+      } finally {
         setLoading(false);
-      });
+      }
+    }
+    loadProfile();
   }, [slug]);
 
   if (loading) {
@@ -35,11 +41,11 @@ export default function TeamMemberProfile() {
     );
   }
 
-  if (!member) {
+  if (error || !member) {
     return (
       <div className="bg-[#FAF8F5] min-h-screen pt-32 pb-16 flex items-center justify-center text-center">
         <div className="space-y-4">
-          <p className="font-mono text-sm text-[#B91C1C]">Profile not found.</p>
+          <p className="font-mono text-sm text-[#B91C1C]">{error || "Profile not found."}</p>
           <Link to="/about/team" className="text-xs font-bold text-neutral-700 underline uppercase font-mono">
             Return to Team
           </Link>

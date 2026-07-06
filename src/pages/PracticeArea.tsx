@@ -4,6 +4,7 @@ import { ArrowRight } from "lucide-react";
 import { Project } from "../types";
 import ScrollReveal from "../components/ScrollReveal";
 import InteractiveAdvisoryShowcase from "../components/InteractiveAdvisoryShowcase";
+import { DB } from "../supabaseService";
 
 const getAsymmetricCardClasses = (idx: number) => {
   const pattern = idx % 5; // Clean 5-item asymmetrical loop
@@ -223,6 +224,7 @@ export default function PracticeArea() {
   const location = useLocation();
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   // Determine the current practice area configuration from path
   const path = location.pathname;
@@ -245,20 +247,21 @@ export default function PracticeArea() {
   const mainTitleWords = titleWords.join(" ");
 
   useEffect(() => {
-    setLoading(true);
-    fetch("/api/projects")
-      .then((res) => res.json())
-      .then((data) => {
-        if (Array.isArray(data)) {
-          const filtered = data.filter((p) => p.practice_area === activeAreaId);
-          setProjects(filtered);
-        }
-        setLoading(false);
-      })
-      .catch((err) => {
+    async function loadProjects() {
+      setLoading(true);
+      setError(null);
+      try {
+        const data = await DB.getProjects();
+        const filtered = data.filter((p) => p.practice_area === activeAreaId);
+        setProjects(filtered);
+      } catch (err: any) {
         console.error("Failed to fetch projects for practice area", err);
+        setError(err.message || "Failed to retrieve projects.");
+      } finally {
         setLoading(false);
-      });
+      }
+    }
+    loadProjects();
   }, [activeAreaId]);
 
   return (
@@ -414,6 +417,10 @@ export default function PracticeArea() {
             <div className="flex flex-col items-center justify-center py-24 space-y-4">
               <div className="w-6 h-6 border-2 border-[#B91C1C] border-t-transparent rounded-full animate-spin" />
               <p className="font-mono text-xs text-neutral-400 tracking-widest uppercase">Querying files...</p>
+            </div>
+          ) : error ? (
+            <div className="text-center py-24 font-mono text-xs text-red-500">
+              {error}
             </div>
           ) : projects.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-12 gap-8 lg:gap-12">

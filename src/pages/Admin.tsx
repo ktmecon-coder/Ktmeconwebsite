@@ -1,6 +1,8 @@
 import { useState, useEffect, FormEvent, DragEvent, ChangeEvent } from "react";
 import { LogIn, Plus, Edit2, Trash2, Check, RefreshCw, Layers, Users, BookOpen, Settings, Upload } from "lucide-react";
 import { Project, TeamMember, SiteContent } from "../types";
+import { DB, isSupabaseConfigured } from "../supabaseService";
+import { supabase } from "../supabase";
 
 // Renders an elegant photo upload drag & drop field that automatically center-crops and optimizes images
 function ImageUpload({
@@ -311,14 +313,70 @@ export default function Admin() {
 
   const checkDbStatus = async () => {
     setCheckingDb(true);
+    if (!isSupabaseConfigured()) {
+      setDbStatus({
+        configured: false,
+        connected: false,
+        tablesExist: false,
+        driver: "local-storage",
+        message: "Supabase credentials are not configured in environment variables.",
+        details: "Please add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to your .env file."
+      });
+      setCheckingDb(false);
+      return;
+    }
+
     try {
-      const res = await fetch("/api/db-status");
-      if (res.ok) {
-        const data = await res.json();
-        setDbStatus(data);
+      const { data, error } = await supabase.from("team_members").select("id").limit(1);
+      if (error) {
+        const isRelationMissing = error.code === "42P01" || 
+          error.code === "PGRST125" ||
+          (error.message && typeof error.message === "string" && (
+            error.message.toLowerCase().includes("relation") || 
+            error.message.toLowerCase().includes("does not exist") ||
+            error.message.toLowerCase().includes("invalid path")
+          ));
+
+        if (isRelationMissing) {
+          setDbStatus({
+            configured: true,
+            connected: true, // Handshake succeeded, but tables not set up yet
+            tablesExist: false,
+            driver: "local-storage",
+            message: "Handshake successful, but database tables do not exist yet.",
+            details: "You need to execute the SQL statements in /supabase-schema.sql inside your Supabase SQL editor to create the TEAM_MEMBERS, PROJECTS, and SITE_CONTENT tables.",
+            error: error.message
+          });
+        } else {
+          setDbStatus({
+            configured: true,
+            connected: false,
+            tablesExist: false,
+            driver: "local-storage",
+            message: `Supabase query failed with code ${error.code || "unknown"}: ${error.message}`,
+            details: "Please check your Supabase credentials or network connection.",
+            error: error.message
+          });
+        }
+      } else {
+        setDbStatus({
+          configured: true,
+          connected: true,
+          tablesExist: true,
+          driver: "supabase",
+          message: "Successfully connected to Supabase! Cloud persistence is active.",
+          details: "All operations are reading and writing directly to your Supabase PostgreSQL instance."
+        });
       }
-    } catch (err) {
-      console.error("Failed to check database connection status", err);
+    } catch (err: any) {
+      setDbStatus({
+        configured: true,
+        connected: false,
+        tablesExist: false,
+        driver: "local-storage",
+        message: `An unexpected connection error occurred: ${err.message || err}`,
+        details: "Check the console logs for stack traces."
+      });
     } finally {
       setCheckingDb(false);
     }
@@ -338,15 +396,12 @@ export default function Admin() {
   const fetchDashboardData = async () => {
     setLoading(true);
     try {
-      checkDbStatus(); // Check database status asynchronously
-      const [resProj, resTeam, resCont] = await Promise.all([
-        fetch("/api/projects"),
-        fetch("/api/team"),
-        fetch("/api/content")
+      checkDbStatus(); // Check database status
+      const [dataProj, dataTeam, dataCont] = await Promise.all([
+        DB.getProjects(),
+        DB.getTeamMembers(),
+        DB.getSiteContent()
       ]);
-      const dataProj = await resProj.json();
-      const dataTeam = await resTeam.json();
-      const dataCont = await resCont.json();
 
       if (Array.isArray(dataProj)) setProjects(dataProj);
       if (Array.isArray(dataTeam)) setTeam(dataTeam);
@@ -386,20 +441,15 @@ export default function Admin() {
     e.preventDefault();
     setAuthError("");
     try {
-      const res = await fetch("/api/admin/verify", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password })
-      });
-      const data = await res.json();
-      if (data.success) {
-        sessionStorage.setItem("ke_admin_token", data.token);
+      const adminPass = import.meta.env.VITE_ADMIN_PASSWORD || "KathmanduEcoAdmin2026!";
+      if (password === adminPass) {
+        sessionStorage.setItem("ke_admin_token", "KE_ADMIN_SESSION_TOKEN_2026");
         setIsAuthenticated(true);
       } else {
-        setAuthError(data.error || "Incorrect credentials");
+        setAuthError("Incorrect credentials");
       }
     } catch (err) {
-      setAuthError("Failed to authenticate with server");
+      setAuthError("Failed to authenticate");
     }
   };
 
@@ -440,16 +490,14 @@ export default function Admin() {
 
     try {
       const isNew = !editingProject.id;
-      const url = isNew ? "/api/projects" : `/api/projects/${editingProject.id}`;
-      const method = isNew ? "POST" : "PUT";
+      let result;
+      if (isNew) {
+        result = await DB.addProject(editingProject as Omit<Project, "id" | "created_at">);
+      } else {
+        result = await DB.updateProject(editingProject.id!, editingProject);
+      }
 
-      const res = await fetch(url, {
-        method,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(editingProject)
-      });
-
-      if (res.ok) {
+      if (result) {
         setEditMessage(`Project "${editingProject.title}" saved successfully.`);
         setEditingProject(null);
         fetchDashboardData();
@@ -457,7 +505,7 @@ export default function Admin() {
         setEditMessage("Failed to save project.");
       }
     } catch (err) {
-      setEditMessage("Error connecting to server.");
+      setEditMessage("Error saving project.");
     }
   };
 
@@ -469,15 +517,15 @@ export default function Admin() {
 
   const executeDeleteProject = async (id: string) => {
     try {
-      const res = await fetch(`/api/projects/${id}`, { method: "DELETE" });
-      if (res.ok) {
+      const success = await DB.deleteProject(id);
+      if (success) {
         setEditMessage("Research case deleted successfully.");
         fetchDashboardData();
       } else {
         setEditMessage("Failed to delete research case.");
       }
     } catch (err) {
-      setEditMessage("Error connecting to server to delete research case.");
+      setEditMessage("Error deleting research case.");
     }
   };
 
@@ -507,16 +555,14 @@ export default function Admin() {
 
     try {
       const isNew = !editingTeam.id;
-      const url = isNew ? "/api/team" : `/api/team/${editingTeam.id}`;
-      const method = isNew ? "POST" : "PUT";
+      let result;
+      if (isNew) {
+        result = await DB.addTeamMember(editingTeam as Omit<TeamMember, "id" | "created_at">);
+      } else {
+        result = await DB.updateTeamMember(editingTeam.id!, editingTeam);
+      }
 
-      const res = await fetch(url, {
-        method,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(editingTeam)
-      });
-
-      if (res.ok) {
+      if (result) {
         setEditMessage(`Team member "${editingTeam.name}" saved successfully.`);
         setEditingTeam(null);
         fetchDashboardData();
@@ -524,7 +570,7 @@ export default function Admin() {
         setEditMessage("Failed to save team member.");
       }
     } catch (err) {
-      setEditMessage("Error connecting to server.");
+      setEditMessage("Error saving team member.");
     }
   };
 
@@ -536,15 +582,15 @@ export default function Admin() {
 
   const executeDeleteTeam = async (id: string) => {
     try {
-      const res = await fetch(`/api/team/${id}`, { method: "DELETE" });
-      if (res.ok) {
+      const success = await DB.deleteTeamMember(id);
+      if (success) {
         setEditMessage("Faculty record deleted successfully.");
         fetchDashboardData();
       } else {
         setEditMessage("Failed to delete faculty record.");
       }
     } catch (err) {
-      setEditMessage("Error connecting to server to delete faculty record.");
+      setEditMessage("Error deleting faculty record.");
     }
   };
 
@@ -554,19 +600,15 @@ export default function Admin() {
   const handleSaveSiteContent = async (page: string, section: string, content: any) => {
     setEditMessage("");
     try {
-      const res = await fetch("/api/content", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ page, section, content })
-      });
-      if (res.ok) {
+      const result = await DB.updateSiteContent(page, section, content);
+      if (result) {
         setEditMessage("Institutional site content updated successfully.");
         fetchDashboardData();
       } else {
         setEditMessage("Failed to update site content.");
       }
     } catch (err) {
-      setEditMessage("Error syncing with server.");
+      setEditMessage("Error updating site content.");
     }
   };
 

@@ -25,6 +25,7 @@ import Lenis from "lenis";
 import { Project, TeamMember } from "../types";
 import ScrollReveal from "../components/ScrollReveal";
 import InteractiveAdvisoryShowcase from "../components/InteractiveAdvisoryShowcase";
+import { DB } from "../supabaseService";
 
 export default function Home() {
   const [projects, setProjects] = useState<Project[]>([]);
@@ -66,8 +67,7 @@ export default function Home() {
     const interval = setInterval(updateClock, 1000);
 
     // Fetch dynamic project dispatches
-    fetch("/api/projects")
-      .then((res) => res.json())
+    DB.getProjects()
       .then((data) => {
         if (Array.isArray(data)) {
           setProjects(data.filter((p) => p.featured).slice(0, 3));
@@ -76,8 +76,7 @@ export default function Home() {
       .catch((err) => console.error("Failed to load projects", err));
 
     // Fetch elite board members
-    fetch("/api/team")
-      .then((res) => res.json())
+    DB.getTeamMembers()
       .then((data) => {
         if (Array.isArray(data)) {
           setTeam(data.slice(0, 3)); // Display top 3

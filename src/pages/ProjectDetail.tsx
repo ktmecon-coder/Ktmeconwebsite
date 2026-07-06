@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { ArrowLeft, BookOpen, Clock, Tag, Globe, ArrowRight } from "lucide-react";
 import { Project } from "../types";
+import { DB } from "../supabaseService";
 
 export default function ProjectDetail() {
   const { slug } = useParams();
@@ -9,35 +10,37 @@ export default function ProjectDetail() {
   const [project, setProject] = useState<Project | null>(null);
   const [related, setRelated] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    setLoading(true);
-    fetch(`/api/projects/${slug}`)
-      .then((res) => {
-        if (!res.ok) throw new Error("Not found");
-        return res.json();
-      })
-      .then((data) => {
+    async function loadProjectDetails() {
+      if (!slug) return;
+      setLoading(true);
+      setError(null);
+      try {
+        const data = await DB.getProjectBySlug(slug);
+        if (!data) {
+          throw new Error("Research report registry record not found.");
+        }
         setProject(data);
+        
         // Load other projects to filter for related ones
-        return fetch("/api/projects");
-      })
-      .then((res) => res.json())
-      .then((allProjects) => {
-        if (Array.isArray(allProjects) && project) {
-          // Filter out the current project, and keep projects from the same practice area or just take any other 2
+        const allProjects = await DB.getProjects();
+        if (Array.isArray(allProjects)) {
           const filtered = allProjects
             .filter((p) => p.slug !== slug)
             .slice(0, 2);
           setRelated(filtered);
         }
-        setLoading(false);
-      })
-      .catch((err) => {
+      } catch (err: any) {
         console.error("Failed to load project details", err);
+        setError(err.message || "Failed to load project details.");
+      } finally {
         setLoading(false);
-      });
-  }, [slug, project?.id]);
+      }
+    }
+    loadProjectDetails();
+  }, [slug]);
 
   if (loading) {
     return (
@@ -47,11 +50,11 @@ export default function ProjectDetail() {
     );
   }
 
-  if (!project) {
+  if (error || !project) {
     return (
       <div className="bg-[#FCFAF6] min-h-screen pt-32 pb-16 flex items-center justify-center text-center">
         <div className="space-y-4">
-          <p className="font-mono text-sm text-[#B91C1C]">Research report registry record not found.</p>
+          <p className="font-mono text-sm text-[#B91C1C]">{error || "Research report registry record not found."}</p>
           <Link to="/our-work/economic-modelling" className="text-xs font-bold text-gray-700 underline uppercase font-mono">
             Return to Core Practices
           </Link>
