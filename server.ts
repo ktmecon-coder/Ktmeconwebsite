@@ -208,31 +208,43 @@ const initialSeedData = {
   ]
 };
 
-// Ensure directory and db file exist
-if (!fs.existsSync(dbDir)) {
-  fs.mkdirSync(dbDir, { recursive: true });
-}
-if (!fs.existsSync(dbPath)) {
-  fs.writeFileSync(dbPath, JSON.stringify(initialSeedData, null, 2), "utf8");
+let cachedDB: any = null;
+
+// Ensure directory and db file exist safely (handled gracefully for read-only serverless platforms like Vercel)
+try {
+  if (!fs.existsSync(dbDir)) {
+    fs.mkdirSync(dbDir, { recursive: true });
+  }
+  if (!fs.existsSync(dbPath)) {
+    fs.writeFileSync(dbPath, JSON.stringify(initialSeedData, null, 2), "utf8");
+  }
+} catch (err) {
+  console.warn("[DB] Failed to initialize local file DB (filesystem may be read-only). Falling back to in-memory caching.", err);
 }
 
 // Read database helper
 function readLocalDB() {
+  if (cachedDB) return cachedDB;
   try {
-    const data = fs.readFileSync(dbPath, "utf8");
-    return JSON.parse(data);
+    if (fs.existsSync(dbPath)) {
+      const data = fs.readFileSync(dbPath, "utf8");
+      cachedDB = JSON.parse(data);
+      return cachedDB;
+    }
   } catch (err) {
-    console.error("Failed to read local DB, resetting to seed", err);
-    return initialSeedData;
+    console.error("Failed to read local DB, falling back to seed data", err);
   }
+  cachedDB = JSON.parse(JSON.stringify(initialSeedData));
+  return cachedDB;
 }
 
 // Write database helper
 function writeLocalDB(data: any) {
+  cachedDB = data;
   try {
     fs.writeFileSync(dbPath, JSON.stringify(data, null, 2), "utf8");
   } catch (err) {
-    console.error("Failed to write to local DB", err);
+    console.warn("Failed to write to local DB (filesystem may be read-only). Kept in memory.", err);
   }
 }
 
