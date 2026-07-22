@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { 
   ArrowRight, 
@@ -87,15 +87,44 @@ export default function Home() {
     return () => clearInterval(interval);
   }, []);
 
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  const handleScroll = () => {
+    if (!scrollContainerRef.current) return;
+    const container = scrollContainerRef.current;
+    const scrollLeft = container.scrollLeft;
+    const cardWidth = container.querySelector(".snap-center")?.clientWidth || container.clientWidth;
+    const gap = 24; // gap-6 is 24px
+    const index = Math.round(scrollLeft / (cardWidth + gap));
+    setMobileSlideIndex(index);
+  };
+
+  const scrollToSlide = (index: number) => {
+    if (!scrollContainerRef.current) return;
+    const container = scrollContainerRef.current;
+    const cards = container.querySelectorAll(".snap-center");
+    const targetCard = cards[index] as HTMLElement;
+    if (targetCard) {
+      container.scrollTo({
+        left: targetCard.offsetLeft - 24, // Keep left padding alignment offset
+        behavior: "smooth"
+      });
+      setMobileSlideIndex(index);
+    }
+  };
+
   const handleNext = () => {
     if (team.length > 0) {
-      setMobileSlideIndex((prev) => (prev + 1) % team.length);
+      const nextIndex = (mobileSlideIndex + 1) % Math.min(team.length, 3);
+      scrollToSlide(nextIndex);
     }
   };
 
   const handlePrev = () => {
     if (team.length > 0) {
-      setMobileSlideIndex((prev) => (prev - 1 + team.length) % team.length);
+      const maxIndex = Math.min(team.length, 3);
+      const prevIndex = (mobileSlideIndex - 1 + maxIndex) % maxIndex;
+      scrollToSlide(prevIndex);
     }
   };
 
@@ -538,11 +567,11 @@ export default function Home() {
       </section>
 
       {/* 4. ACADEMIC & ADVISORY TEAM */}
-      <section id="home-team-section" className="py-24 sm:py-32 bg-[#FCFAF6] border-b border-neutral-200">
+      <section id="home-team-section" className="py-16 sm:py-24 lg:py-32 bg-[#FCFAF6] border-b border-neutral-200">
         <div className="max-w-[1440px] mx-auto px-6 sm:px-12">
           
           {/* Header */}
-          <div className="mb-16 flex flex-col lg:flex-row lg:items-end justify-between gap-8 pb-8 border-b border-neutral-200/60">
+          <div className="mb-10 lg:mb-16 flex flex-col lg:flex-row lg:items-end justify-between gap-6 pb-6 lg:pb-8 border-b border-neutral-200/60">
             <div className="space-y-3">
               <span className="text-[11px] font-mono tracking-[0.25em] text-[#B91C1C] font-extrabold uppercase block">
                 TEAM
@@ -612,76 +641,70 @@ export default function Home() {
             )}
           </div>
 
-          {/* Mobile responsive carousel layout */}
+          {/* Mobile responsive swipeable cards layout */}
           <div className="block lg:hidden">
-            {team.length > 0 && team[mobileSlideIndex] ? (
-              <div className="relative">
-                {/* Carousel Card Slider */}
-                <div className="bg-white border border-neutral-200 rounded-[28px] overflow-hidden flex flex-col shadow-md relative min-h-[440px] group">
-                  {/* Slide Image */}
-                  <div className="relative aspect-[4/5] sm:aspect-[4/3] w-full overflow-hidden bg-neutral-100">
-                    <img
-                      src={team[mobileSlideIndex].photo_url}
-                      alt={team[mobileSlideIndex].name}
-                      className="w-full h-full object-cover filter grayscale"
-                      referrerPolicy="no-referrer"
-                    />
-                    
-                    {/* Dark gradient vignette */}
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent pointer-events-none" />
-
-                    {/* Aesthetic Navigation Buttons inside the carousel image area */}
-                    <button
-                      onClick={handlePrev}
-                      className="absolute left-4 top-1/2 -translate-y-1/2 z-10 w-9 h-9 rounded-full bg-white/95 backdrop-blur-md hover:bg-[#B91C1C] hover:text-white text-neutral-800 border border-neutral-200/40 flex items-center justify-center shadow-md hover:shadow-lg transition-all duration-300 active:scale-90"
-                      aria-label="Previous profile"
+            {team.length > 0 ? (
+              <div className="space-y-5">
+                {/* Horizontally scrollable container with snap align */}
+                <div 
+                  ref={scrollContainerRef}
+                  onScroll={handleScroll}
+                  className="flex gap-6 overflow-x-auto snap-x snap-mandatory no-scrollbar pt-2 pb-4 px-6 -mx-6 scroll-smooth"
+                >
+                  {team.slice(0, 3).map((member, idx) => (
+                    <div 
+                      key={member.id}
+                      className="w-[82vw] max-w-[320px] flex-shrink-0 snap-center relative rounded-[32px] overflow-hidden aspect-[3/4] sm:aspect-[4/5] shadow-xl group active:scale-[0.98] transition-all duration-300"
                     >
-                      <ChevronLeft className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={handleNext}
-                      className="absolute right-4 top-1/2 -translate-y-1/2 z-10 w-9 h-9 rounded-full bg-white/95 backdrop-blur-md hover:bg-[#B91C1C] hover:text-white text-neutral-800 border border-neutral-200/40 flex items-center justify-center shadow-md hover:shadow-lg transition-all duration-300 active:scale-90"
-                      aria-label="Next profile"
-                    >
-                      <ChevronRight className="w-4 h-4" />
-                    </button>
-                  </div>
-
-                  {/* Content (Just name and position) */}
-                  <div className="p-6 flex-grow flex flex-col justify-between space-y-4">
-                    <div className="space-y-1">
-                      <h3 className="font-serif text-xl sm:text-2xl font-light text-neutral-900">
-                        {team[mobileSlideIndex].name}
-                      </h3>
-                      <p className="text-xs font-mono text-[#B91C1C] uppercase tracking-widest font-semibold">
-                        {team[mobileSlideIndex].title}
-                      </p>
-                    </div>
-
-                    <div className="pt-4 flex items-center justify-between border-t border-neutral-100">
-                      <Link
-                        to={`/team/${team[mobileSlideIndex].slug}`}
-                        className="inline-flex items-center gap-1.5 text-xs font-mono font-bold uppercase tracking-widest text-neutral-400 hover:text-[#B91C1C] transition-colors duration-200"
-                      >
-                        Read Profile
-                        <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-1" />
-                      </Link>
+                      {/* Card Background Image with Grayscale Filter */}
+                      <img
+                        src={member.photo_url}
+                        alt={member.name}
+                        className="absolute inset-0 w-full h-full object-cover filter grayscale group-hover:grayscale-0 transition-all duration-700 ease-out"
+                        referrerPolicy="no-referrer"
+                      />
                       
-                      {/* Indicators inside the card */}
-                      <div className="flex items-center gap-1.5">
-                        {team.slice(0, 3).map((_, dotIdx) => (
-                          <button
-                            key={dotIdx}
-                            onClick={() => setMobileSlideIndex(dotIdx)}
-                            className={`transition-all duration-300 h-1 rounded-full ${
-                              mobileSlideIndex === dotIdx ? "w-4 bg-[#B91C1C]" : "w-1 bg-neutral-300 hover:bg-neutral-400"
-                            }`}
-                            aria-label={`Go to slide ${dotIdx + 1}`}
-                          />
-                        ))}
+                      {/* Deep dark gradient overlay for content contrast */}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent opacity-95 pointer-events-none" />
+
+                      {/* Content overlays matching the design inspiration */}
+                      <div className="absolute inset-0 p-6 flex flex-col justify-end space-y-4">
+                        <div className="space-y-1">
+                          <span className="text-[10px] font-mono text-[#F43F5E] uppercase tracking-[0.2em] font-bold block">
+                            {member.title}
+                          </span>
+                          <h3 className="font-serif text-2xl sm:text-3xl font-light text-white leading-tight">
+                            {member.name}
+                          </h3>
+                        </div>
+
+                        {/* Solid white primary action button */}
+                        <div className="pt-2">
+                          <Link
+                            to={`/team/${member.slug}`}
+                            className="inline-flex items-center justify-center gap-2 w-full py-3.5 rounded-2xl bg-white hover:bg-neutral-100 text-[#111111] font-mono text-xs font-bold uppercase tracking-widest shadow-md transition-all duration-300 active:scale-95"
+                          >
+                            Read Profile
+                            <ArrowRight className="w-3.5 h-3.5" />
+                          </Link>
+                        </div>
                       </div>
                     </div>
-                  </div>
+                  ))}
+                </div>
+
+                {/* Aesthetic dot indicators based on active scroll-snap index */}
+                <div className="flex items-center justify-center gap-2 pt-1">
+                  {team.slice(0, 3).map((_, dotIdx) => (
+                    <button
+                      key={dotIdx}
+                      onClick={() => scrollToSlide(dotIdx)}
+                      className={`transition-all duration-500 h-1 rounded-full ${
+                        mobileSlideIndex === dotIdx ? "w-6 bg-[#B91C1C]" : "w-1.5 bg-neutral-300 hover:bg-neutral-400"
+                      }`}
+                      aria-label={`Go to slide ${dotIdx + 1}`}
+                    />
+                  ))}
                 </div>
               </div>
             ) : (

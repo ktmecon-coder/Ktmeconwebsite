@@ -270,6 +270,57 @@ export default function AboutUs() {
         </div>
       </section>
 
+      {/* BOTTOM SECTION: ELEGANT NAVIGATION CONTINUATION (NEXT / PREVIOUS) */}
+      <section className="border-t border-b border-neutral-200/80 bg-[#FAF8F5]">
+        <div className="max-w-[1440px] mx-auto grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-neutral-200/80">
+          
+          {/* Card 1: Mission & Values */}
+          <Link 
+            to="/about/mission-values" 
+            className="group p-10 sm:p-14 lg:p-20 flex flex-col justify-between hover:bg-[#F3EFE6]/30 transition-all duration-500 ease-in-out min-h-[280px] md:min-h-[340px]"
+          >
+            <div className="space-y-4">
+              <span className="text-[10px] font-mono tracking-[0.25em] text-[#B91C1C] font-extrabold uppercase block">
+                CONTINUE
+              </span>
+              <h3 className="font-serif text-3xl sm:text-4xl lg:text-5xl font-light text-neutral-900 group-hover:text-[#B91C1C] transition-colors duration-300 leading-tight">
+                Mission &amp; Values
+              </h3>
+              <p className="font-serif text-neutral-500 text-sm sm:text-base leading-relaxed font-light max-w-md pt-1">
+                The mission that anchors the firm &mdash; and the operating values that shape every engagement.
+              </p>
+            </div>
+            <div className="pt-8 flex items-center gap-2 text-[10px] font-mono font-bold uppercase tracking-widest text-[#B91C1C] transition-all duration-300">
+              <span>READ MORE</span>
+              <ArrowRight className="w-4 h-4 transition-transform duration-300 group-hover:translate-x-1.5" />
+            </div>
+          </Link>
+
+          {/* Card 2: The Team */}
+          <Link 
+            to="/about/team" 
+            className="group p-10 sm:p-14 lg:p-20 flex flex-col justify-between hover:bg-[#F3EFE6]/30 transition-all duration-500 ease-in-out min-h-[280px] md:min-h-[340px]"
+          >
+            <div className="space-y-4">
+              <span className="text-[10px] font-mono tracking-[0.25em] text-[#B91C1C] font-extrabold uppercase block">
+                CONTINUE
+              </span>
+              <h3 className="font-serif text-3xl sm:text-4xl lg:text-5xl font-light text-neutral-900 group-hover:text-[#B91C1C] transition-colors duration-300 leading-tight">
+                The Team
+              </h3>
+              <p className="font-serif text-neutral-500 text-sm sm:text-base leading-relaxed font-light max-w-md pt-1">
+                Scholarship, institutional experience, and methodological discipline &mdash; meet the people behind the evidence.
+              </p>
+            </div>
+            <div className="pt-8 flex items-center gap-2 text-[10px] font-mono font-bold uppercase tracking-widest text-[#B91C1C] transition-all duration-300">
+              <span>MEET THE TEAM</span>
+              <ArrowRight className="w-4 h-4 transition-transform duration-300 group-hover:translate-x-1.5" />
+            </div>
+          </Link>
+
+        </div>
+      </section>
+
       {/* SECTION 3: STATEMENT CALLOUT BAR */}
       <section className="bg-neutral-950 text-white py-24 sm:py-32 relative overflow-hidden">
         <div className="absolute inset-0 opacity-10 pointer-events-none">
